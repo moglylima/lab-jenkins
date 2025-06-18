@@ -5,7 +5,7 @@ pipeline {
     stages {
         stage('Build docker image') {
             steps {
-                sh 'echo "Building Docker image...."'
+                sh 'echo "Building Docker image......"'
                 script {
                  dockerapp = docker.build("moglesonlima/lab-jenkins:${env.BUILD_ID}", '-f ./dir/Dockerfile ./dir')
                 }
