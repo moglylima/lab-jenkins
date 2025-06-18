@@ -1,0 +1,26 @@
+pipeline {
+
+    agent any
+    
+    stages {
+        stage('Build docker image') {
+            steps {
+                sh 'echo "Building Docker image..."'
+
+            }
+        }
+
+        stage('Push docker image') {
+            steps {
+                sh 'echo "Pushing Docker image to registry..."'
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                sh 'echo "Deploying to Kubernetes cluster..."'
+            }
+        }  
+    }
+        
+}
