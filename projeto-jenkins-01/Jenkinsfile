@@ -18,7 +18,7 @@ pipeline {
 
         stage('Deploy to Kubernetes') {
             steps {
-                sh 'echo "Deploying to Kubernetes cluster..."'
+                sh 'echo "Deploying to Kubernetes cluster...."'
             }
         }  
     }
