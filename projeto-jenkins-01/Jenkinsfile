@@ -5,14 +5,22 @@ pipeline {
     stages {
         stage('Build docker image') {
             steps {
-                sh 'echo "Building Docker image..."'
-
+                sh 'echo "Building Docker image...."'
+                script {
+                 dockerapp = docker.build("moglesonlima/lab-jenkins:${env.BUILD_ID}", '-f ./dir/Dockerfile ./dir')
+                }
             }
         }
 
         stage('Push docker image') {
             steps {
                 sh 'echo "Pushing Docker image to registry..."'
+                script {
+                    docker.withRegistry('https://registry.hub.docker.com', 'dockerhub-credentials') {
+                        dockerapp.push('latest')
+                        dockerapp.push("${env.BUILD_ID}")
+                    }
+                }
             }
         }
 
