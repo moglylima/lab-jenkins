@@ -3,6 +3,17 @@
 // Date: $(date +%Y-%m-%d)
 
 pipeline {
+
+    properties([
+        pipelineTriggers([
+            // Trigger para GitHub push events
+            [$class: "GitHubPushTrigger"],
+            // Polling SCM (opcional, mas útil como fallback)
+            pollSCM('H/1 * * * *') // Verifica a cada 5 minutos
+        ]),
+        disableConcurrentBuilds() // Evita builds concorrentes
+    ])
+    
     agent any
     
     options {
