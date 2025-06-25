@@ -1,9 +1,14 @@
-// Jenkinsfile para criação de instâncias EC2 com parâmetros dinâmicos baseados no ambiente
+// Jenkinsfile para criação de instâncias EC2 com parâmetros dinâmicos reativos
 // Author: DevOps Team
 // Date: $(date +%Y-%m-%d)
 
 pipeline {
     agent any
+    
+    options {
+        disableConcurrentBuilds()
+        timeout(time: 30, unit: 'MINUTES')
+    }
     
     parameters {
         choice(
@@ -11,51 +16,282 @@ pipeline {
             choices: ['dev', 'staging', 'prod'],
             description: 'Ambiente de destino (determina as opções disponíveis)'
         )
-        choice(
+        
+        // Parâmetros reativos usando Active Choices
+        activeChoiceReactiveParam(
             name: 'AWS_ACCOUNT',
-            choices: getAwsAccounts(),
-            description: 'Conta AWS de destino'
+            description: 'Conta AWS de destino',
+            choiceType: 'PT_SINGLE_SELECT',
+            script: [
+                $class: 'GroovyScript',
+                script: [
+                    script: '''
+                        def accounts = [
+                            'dev': ['123456789012'],
+                            'staging': ['234567890123'],
+                            'prod': ['345678901234']
+                        ]
+                        return accounts[ENVIRONMENT] ?: []
+                    ''',
+                    fallbackScript: "return ['Erro: Ambiente inválido']"
+                ]
+            ],
+            referencedParameters: ['ENVIRONMENT']
         )
-        choice(
+        
+        activeChoiceReactiveParam(
             name: 'AWS_REGION',
-            choices: getRegionsByEnvironment(),
-            description: 'Região AWS'
+            description: 'Região AWS',
+            choiceType: 'PT_SINGLE_SELECT',
+            script: [
+                $class: 'GroovyScript',
+                script: [
+                    script: '''
+                        def regions = [
+                            'dev': ['us-east-1', 'us-west-2'],
+                            'staging': ['us-east-1', 'us-west-2', 'eu-west-1'],
+                            'prod': ['us-east-1', 'us-west-2', 'eu-west-1', 'ap-southeast-1']
+                        ]
+                        return regions[ENVIRONMENT] ?: []
+                    ''',
+                    fallbackScript: "return ['Erro: Ambiente inválido']"
+                ]
+            ],
+            referencedParameters: ['ENVIRONMENT']
         )
+        
         string(
             name: 'INSTANCE_NAME',
             defaultValue: 'ec2-instance',
             description: 'Nome da instância EC2 (será prefixado com o ambiente)'
         )
-        choice(
+        
+        activeChoiceReactiveParam(
             name: 'INSTANCE_TYPE',
-            choices: getInstanceTypesByEnvironment(),
-            description: 'Tipo da instância EC2'
+            description: 'Tipo da instância EC2',
+            choiceType: 'PT_SINGLE_SELECT',
+            script: [
+                $class: 'GroovyScript',
+                script: [
+                    script: '''
+                        def instanceTypes = [
+                            'dev': [
+                                't3.micro',
+                                't3.small',
+                                't3.medium'
+                            ],
+                            'staging': [
+                                't3.medium',
+                                't3.large',
+                                'm5.large',
+                                'm5.xlarge'
+                            ],
+                            'prod': [
+                                'm5.large',
+                                'm5.xlarge',
+                                'm5.2xlarge',
+                                'c5.large',
+                                'c5.xlarge',
+                                'c5.2xlarge'
+                            ]
+                        ]
+                        return instanceTypes[ENVIRONMENT] ?: []
+                    ''',
+                    fallbackScript: "return ['Erro: Ambiente inválido']"
+                ]
+            ],
+            referencedParameters: ['ENVIRONMENT']
         )
-        choice(
+        
+        activeChoiceReactiveParam(
             name: 'VPC_ID',
-            choices: getVpcsByEnvironment(),
-            description: 'VPC onde criar a instância'
+            description: 'VPC onde criar a instância',
+            choiceType: 'PT_SINGLE_SELECT',
+            script: [
+                $class: 'GroovyScript',
+                script: [
+                    script: '''
+                        def vpcs = [
+                            'dev': [
+                                'vpc-dev001 (VPC Principal Dev)',
+                                'vpc-dev002 (VPC Secundária Dev)'
+                            ],
+                            'staging': [
+                                'vpc-stg001 (VPC Principal Staging)',
+                                'vpc-stg002 (VPC Secundária Staging)'
+                            ],
+                            'prod': [
+                                'vpc-prd001 (VPC Principal Prod)',
+                                'vpc-prd002 (VPC Secundária Prod)',
+                                'vpc-prd003 (VPC DR Prod)'
+                            ]
+                        ]
+                        return vpcs[ENVIRONMENT] ?: []
+                    ''',
+                    fallbackScript: "return ['Erro: Ambiente inválido']"
+                ]
+            ],
+            referencedParameters: ['ENVIRONMENT']
         )
-        choice(
+        
+        activeChoiceReactiveParam(
             name: 'SUBNET_ID',
-            choices: getSubnetsByEnvironment(),
-            description: 'Subnet onde criar a instância'
+            description: 'Subnet onde criar a instância',
+            choiceType: 'PT_SINGLE_SELECT',
+            script: [
+                $class: 'GroovyScript',
+                script: [
+                    script: '''
+                        def subnets = [
+                            'dev': [
+                                'subnet-dev001 (Public Subnet AZ-1a)',
+                                'subnet-dev002 (Private Subnet AZ-1a)',
+                                'subnet-dev003 (Public Subnet AZ-1b)',
+                                'subnet-dev004 (Private Subnet AZ-1b)'
+                            ],
+                            'staging': [
+                                'subnet-stg001 (Public Subnet AZ-1a)',
+                                'subnet-stg002 (Private Subnet AZ-1a)',
+                                'subnet-stg003 (Public Subnet AZ-1b)',
+                                'subnet-stg004 (Private Subnet AZ-1b)',
+                                'subnet-stg005 (Database Subnet AZ-1a)',
+                                'subnet-stg006 (Database Subnet AZ-1b)'
+                            ],
+                            'prod': [
+                                'subnet-prd001 (Public Subnet AZ-1a)',
+                                'subnet-prd002 (Private Subnet AZ-1a)',
+                                'subnet-prd003 (Public Subnet AZ-1b)',
+                                'subnet-prd004 (Private Subnet AZ-1b)',
+                                'subnet-prd005 (Database Subnet AZ-1a)',
+                                'subnet-prd006 (Database Subnet AZ-1b)',
+                                'subnet-prd007 (Public Subnet AZ-1c)',
+                                'subnet-prd008 (Private Subnet AZ-1c)',
+                                'subnet-prd009 (Database Subnet AZ-1c)'
+                            ]
+                        ]
+                        return subnets[ENVIRONMENT] ?: []
+                    ''',
+                    fallbackScript: "return ['Erro: Ambiente inválido']"
+                ]
+            ],
+            referencedParameters: ['ENVIRONMENT']
         )
-        choice(
+        
+        activeChoiceReactiveParam(
             name: 'SECURITY_GROUP_ID',
-            choices: getSecurityGroupsByEnvironment(),
-            description: 'Security Group para a instância'
+            description: 'Security Group para a instância',
+            choiceType: 'PT_SINGLE_SELECT',
+            script: [
+                $class: 'GroovyScript',
+                script: [
+                    script: '''
+                        def securityGroups = [
+                            'dev': [
+                                'sg-dev001 (Web Servers Dev)',
+                                'sg-dev002 (Database Dev)',
+                                'sg-dev003 (Application Servers Dev)',
+                                'sg-dev004 (Load Balancers Dev)'
+                            ],
+                            'staging': [
+                                'sg-stg001 (Web Servers Staging)',
+                                'sg-stg002 (Database Staging)',
+                                'sg-stg003 (Application Servers Staging)',
+                                'sg-stg004 (Load Balancers Staging)',
+                                'sg-stg005 (Monitoring Staging)'
+                            ],
+                            'prod': [
+                                'sg-prd001 (Web Servers Prod)',
+                                'sg-prd002 (Database Prod)',
+                                'sg-prd003 (Application Servers Prod)',
+                                'sg-prd004 (Load Balancers Prod)',
+                                'sg-prd005 (Monitoring Prod)',
+                                'sg-prd006 (Bastion Hosts Prod)',
+                                'sg-prd007 (NAT Instances Prod)'
+                            ]
+                        ]
+                        return securityGroups[ENVIRONMENT] ?: []
+                    ''',
+                    fallbackScript: "return ['Erro: Ambiente inválido']"
+                ]
+            ],
+            referencedParameters: ['ENVIRONMENT']
         )
-        choice(
+        
+        activeChoiceReactiveParam(
             name: 'AMI_ID',
-            choices: getAmisByEnvironment(),
-            description: 'AMI a ser utilizada'
+            description: 'AMI a ser utilizada',
+            choiceType: 'PT_SINGLE_SELECT',
+            script: [
+                $class: 'GroovyScript',
+                script: [
+                    script: '''
+                        def amis = [
+                            'dev': [
+                                'ami-dev001 (Ubuntu 22.04 LTS Dev)',
+                                'ami-dev002 (Amazon Linux 2023 Dev)',
+                                'ami-dev003 (CentOS 9 Dev)',
+                                'ami-dev004 (Custom App Image Dev)'
+                            ],
+                            'staging': [
+                                'ami-stg001 (Ubuntu 22.04 LTS Staging)',
+                                'ami-stg002 (Amazon Linux 2023 Staging)',
+                                'ami-stg003 (CentOS 9 Staging)',
+                                'ami-stg004 (Custom App Image Staging)',
+                                'ami-stg005 (Hardened Ubuntu Staging)'
+                            ],
+                            'prod': [
+                                'ami-prd001 (Ubuntu 22.04 LTS Prod)',
+                                'ami-prd002 (Amazon Linux 2023 Prod)',
+                                'ami-prd003 (CentOS 9 Prod)',
+                                'ami-prd004 (Custom App Image Prod)',
+                                'ami-prd005 (Hardened Ubuntu Prod)',
+                                'ami-prd006 (Compliance Ubuntu Prod)',
+                                'ami-prd007 (Golden Image Prod)'
+                            ]
+                        ]
+                        return amis[ENVIRONMENT] ?: []
+                    ''',
+                    fallbackScript: "return ['Erro: Ambiente inválido']"
+                ]
+            ],
+            referencedParameters: ['ENVIRONMENT']
         )
-        choice(
+        
+        activeChoiceReactiveParam(
             name: 'KEY_PAIR',
-            choices: getKeyPairsByEnvironment(),
-            description: 'Chave SSH para acesso'
+            description: 'Chave SSH para acesso',
+            choiceType: 'PT_SINGLE_SELECT',
+            script: [
+                $class: 'GroovyScript',
+                script: [
+                    script: '''
+                        def keyPairs = [
+                            'dev': [
+                                'keypair-dev-general',
+                                'keypair-dev-admin',
+                                'keypair-dev-automation'
+                            ],
+                            'staging': [
+                                'keypair-stg-general',
+                                'keypair-stg-admin',
+                                'keypair-stg-automation',
+                                'keypair-stg-testing'
+                            ],
+                            'prod': [
+                                'keypair-prd-general',
+                                'keypair-prd-admin',
+                                'keypair-prd-automation',
+                                'keypair-prd-emergency'
+                            ]
+                        ]
+                        return keyPairs[ENVIRONMENT] ?: []
+                    ''',
+                    fallbackScript: "return ['Erro: Ambiente inválido']"
+                ]
+            ],
+            referencedParameters: ['ENVIRONMENT']
         )
+        
         choice(
             name: 'VOLUME_TYPE',
             choices: ['gp3', 'gp2', 'io1', 'io2'],
@@ -163,199 +399,6 @@ pipeline {
             cleanWs()
         }
     }
-}
-
-// =================================
-// FUNÇÕES DE CONFIGURAÇÃO DINÂMICA
-// =================================
-
-def getAwsAccounts() {
-    def accounts = [
-        'dev': ['123456789012'],
-        'staging': ['234567890123'],
-        'prod': ['345678901234']
-    ]
-    
-    // Em um cenário real, você pode buscar isso de um arquivo de configuração
-    // ou de uma API/banco de dados
-    return ['123456789012', '234567890123', '345678901234']
-}
-
-def getRegionsByEnvironment() {
-    def regions = [
-        'dev': ['us-east-1', 'us-west-2'],
-        'staging': ['us-east-1', 'us-west-2', 'eu-west-1'],
-        'prod': ['us-east-1', 'us-west-2', 'eu-west-1', 'ap-southeast-1']
-    ]
-    
-    def env = params.ENVIRONMENT ?: 'dev'
-    return regions[env] ?: regions['dev']
-}
-
-def getInstanceTypesByEnvironment() {
-    def instanceTypes = [
-        'dev': [
-            't3.micro',
-            't3.small',
-            't3.medium'
-        ],
-        'staging': [
-            't3.medium',
-            't3.large',
-            'm5.large',
-            'm5.xlarge'
-        ],
-        'prod': [
-            'm5.large',
-            'm5.xlarge',
-            'm5.2xlarge',
-            'c5.large',
-            'c5.xlarge',
-            'c5.2xlarge'
-        ]
-    ]
-    
-    def env = params.ENVIRONMENT ?: 'dev'
-    return instanceTypes[env] ?: instanceTypes['dev']
-}
-
-def getVpcsByEnvironment() {
-    def vpcs = [
-        'dev': [
-            'vpc-dev001 (VPC Principal Dev)',
-            'vpc-dev002 (VPC Secundária Dev)'
-        ],
-        'staging': [
-            'vpc-stg001 (VPC Principal Staging)',
-            'vpc-stg002 (VPC Secundária Staging)'
-        ],
-        'prod': [
-            'vpc-prd001 (VPC Principal Prod)',
-            'vpc-prd002 (VPC Secundária Prod)',
-            'vpc-prd003 (VPC DR Prod)'
-        ]
-    ]
-    
-    def env = params.ENVIRONMENT ?: 'dev'
-    return vpcs[env] ?: vpcs['dev']
-}
-
-def getSubnetsByEnvironment() {
-    def subnets = [
-        'dev': [
-            'subnet-dev001 (Public Subnet AZ-1a)',
-            'subnet-dev002 (Private Subnet AZ-1a)',
-            'subnet-dev003 (Public Subnet AZ-1b)',
-            'subnet-dev004 (Private Subnet AZ-1b)'
-        ],
-        'staging': [
-            'subnet-stg001 (Public Subnet AZ-1a)',
-            'subnet-stg002 (Private Subnet AZ-1a)',
-            'subnet-stg003 (Public Subnet AZ-1b)',
-            'subnet-stg004 (Private Subnet AZ-1b)',
-            'subnet-stg005 (Database Subnet AZ-1a)',
-            'subnet-stg006 (Database Subnet AZ-1b)'
-        ],
-        'prod': [
-            'subnet-prd001 (Public Subnet AZ-1a)',
-            'subnet-prd002 (Private Subnet AZ-1a)',
-            'subnet-prd003 (Public Subnet AZ-1b)',
-            'subnet-prd004 (Private Subnet AZ-1b)',
-            'subnet-prd005 (Database Subnet AZ-1a)',
-            'subnet-prd006 (Database Subnet AZ-1b)',
-            'subnet-prd007 (Public Subnet AZ-1c)',
-            'subnet-prd008 (Private Subnet AZ-1c)',
-            'subnet-prd009 (Database Subnet AZ-1c)'
-        ]
-    ]
-    
-    def env = params.ENVIRONMENT ?: 'dev'
-    return subnets[env] ?: subnets['dev']
-}
-
-def getSecurityGroupsByEnvironment() {
-    def securityGroups = [
-        'dev': [
-            'sg-dev001 (Web Servers Dev)',
-            'sg-dev002 (Database Dev)',
-            'sg-dev003 (Application Servers Dev)',
-            'sg-dev004 (Load Balancers Dev)'
-        ],
-        'staging': [
-            'sg-stg001 (Web Servers Staging)',
-            'sg-stg002 (Database Staging)',
-            'sg-stg003 (Application Servers Staging)',
-            'sg-stg004 (Load Balancers Staging)',
-            'sg-stg005 (Monitoring Staging)'
-        ],
-        'prod': [
-            'sg-prd001 (Web Servers Prod)',
-            'sg-prd002 (Database Prod)',
-            'sg-prd003 (Application Servers Prod)',
-            'sg-prd004 (Load Balancers Prod)',
-            'sg-prd005 (Monitoring Prod)',
-            'sg-prd006 (Bastion Hosts Prod)',
-            'sg-prd007 (NAT Instances Prod)'
-        ]
-    ]
-    
-    def env = params.ENVIRONMENT ?: 'dev'
-    return securityGroups[env] ?: securityGroups['dev']
-}
-
-def getAmisByEnvironment() {
-    def amis = [
-        'dev': [
-            'ami-dev001 (Ubuntu 22.04 LTS Dev)',
-            'ami-dev002 (Amazon Linux 2023 Dev)',
-            'ami-dev003 (CentOS 9 Dev)',
-            'ami-dev004 (Custom App Image Dev)'
-        ],
-        'staging': [
-            'ami-stg001 (Ubuntu 22.04 LTS Staging)',
-            'ami-stg002 (Amazon Linux 2023 Staging)',
-            'ami-stg003 (CentOS 9 Staging)',
-            'ami-stg004 (Custom App Image Staging)',
-            'ami-stg005 (Hardened Ubuntu Staging)'
-        ],
-        'prod': [
-            'ami-prd001 (Ubuntu 22.04 LTS Prod)',
-            'ami-prd002 (Amazon Linux 2023 Prod)',
-            'ami-prd003 (CentOS 9 Prod)',
-            'ami-prd004 (Custom App Image Prod)',
-            'ami-prd005 (Hardened Ubuntu Prod)',
-            'ami-prd006 (Compliance Ubuntu Prod)',
-            'ami-prd007 (Golden Image Prod)'
-        ]
-    ]
-    
-    def env = params.ENVIRONMENT ?: 'dev'
-    return amis[env] ?: amis['dev']
-}
-
-def getKeyPairsByEnvironment() {
-    def keyPairs = [
-        'dev': [
-            'keypair-dev-general',
-            'keypair-dev-admin',
-            'keypair-dev-automation'
-        ],
-        'staging': [
-            'keypair-stg-general',
-            'keypair-stg-admin',
-            'keypair-stg-automation',
-            'keypair-stg-testing'
-        ],
-        'prod': [
-            'keypair-prd-general',
-            'keypair-prd-admin',
-            'keypair-prd-automation',
-            'keypair-prd-emergency'
-        ]
-    ]
-    
-    def env = params.ENVIRONMENT ?: 'dev'
-    return keyPairs[env] ?: keyPairs['dev']
 }
 
 // ==========================
