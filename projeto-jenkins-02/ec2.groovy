@@ -3,18 +3,12 @@
 // Date: $(date +%Y-%m-%d)
 
 pipeline {
-
-    properties([
-        pipelineTriggers([
-            // Trigger para GitHub push events
-            [$class: "GitHubPushTrigger"],
-            // Polling SCM (opcional, mas útil como fallback)
-            pollSCM('H/1 * * * *') // Verifica a cada 5 minutos
-        ]),
-        disableConcurrentBuilds() // Evita builds concorrentes
-    ])
-    
     agent any
+    
+    triggers {
+        githubPush()
+        pollSCM('H/5 * * * *')  // Polling de fallback a cada 5 minutos
+    }
     
     options {
         disableConcurrentBuilds()
@@ -29,7 +23,7 @@ pipeline {
         )
         
         // Parâmetros reativos usando Active Choices
-        activeChoiceReactiveParam(
+        activeChoice(
             name: 'AWS_ACCOUNT',
             description: 'Conta AWS de destino',
             choiceType: 'PT_SINGLE_SELECT',
@@ -42,15 +36,14 @@ pipeline {
                             'staging': ['234567890123'],
                             'prod': ['345678901234']
                         ]
-                        return accounts[ENVIRONMENT] ?: []
+                        return accounts[params.ENVIRONMENT] ?: []
                     ''',
                     fallbackScript: "return ['Erro: Ambiente inválido']"
                 ]
-            ],
-            referencedParameters: ['ENVIRONMENT']
+            ]
         )
         
-        activeChoiceReactiveParam(
+        activeChoice(
             name: 'AWS_REGION',
             description: 'Região AWS',
             choiceType: 'PT_SINGLE_SELECT',
@@ -63,12 +56,11 @@ pipeline {
                             'staging': ['us-east-1', 'us-west-2', 'eu-west-1'],
                             'prod': ['us-east-1', 'us-west-2', 'eu-west-1', 'ap-southeast-1']
                         ]
-                        return regions[ENVIRONMENT] ?: []
+                        return regions[params.ENVIRONMENT] ?: []
                     ''',
                     fallbackScript: "return ['Erro: Ambiente inválido']"
                 ]
-            ],
-            referencedParameters: ['ENVIRONMENT']
+            ]
         )
         
         string(
@@ -77,7 +69,7 @@ pipeline {
             description: 'Nome da instância EC2 (será prefixado com o ambiente)'
         )
         
-        activeChoiceReactiveParam(
+        activeChoice(
             name: 'INSTANCE_TYPE',
             description: 'Tipo da instância EC2',
             choiceType: 'PT_SINGLE_SELECT',
@@ -106,15 +98,14 @@ pipeline {
                                 'c5.2xlarge'
                             ]
                         ]
-                        return instanceTypes[ENVIRONMENT] ?: []
+                        return instanceTypes[params.ENVIRONMENT] ?: []
                     ''',
                     fallbackScript: "return ['Erro: Ambiente inválido']"
                 ]
-            ],
-            referencedParameters: ['ENVIRONMENT']
+            ]
         )
         
-        activeChoiceReactiveParam(
+        activeChoice(
             name: 'VPC_ID',
             description: 'VPC onde criar a instância',
             choiceType: 'PT_SINGLE_SELECT',
@@ -137,15 +128,14 @@ pipeline {
                                 'vpc-prd003 (VPC DR Prod)'
                             ]
                         ]
-                        return vpcs[ENVIRONMENT] ?: []
+                        return vpcs[params.ENVIRONMENT] ?: []
                     ''',
                     fallbackScript: "return ['Erro: Ambiente inválido']"
                 ]
-            ],
-            referencedParameters: ['ENVIRONMENT']
+            ]
         )
         
-        activeChoiceReactiveParam(
+        activeChoice(
             name: 'SUBNET_ID',
             description: 'Subnet onde criar a instância',
             choiceType: 'PT_SINGLE_SELECT',
@@ -180,15 +170,14 @@ pipeline {
                                 'subnet-prd009 (Database Subnet AZ-1c)'
                             ]
                         ]
-                        return subnets[ENVIRONMENT] ?: []
+                        return subnets[params.ENVIRONMENT] ?: []
                     ''',
                     fallbackScript: "return ['Erro: Ambiente inválido']"
                 ]
-            ],
-            referencedParameters: ['ENVIRONMENT']
+            ]
         )
         
-        activeChoiceReactiveParam(
+        activeChoice(
             name: 'SECURITY_GROUP_ID',
             description: 'Security Group para a instância',
             choiceType: 'PT_SINGLE_SELECT',
@@ -220,15 +209,14 @@ pipeline {
                                 'sg-prd007 (NAT Instances Prod)'
                             ]
                         ]
-                        return securityGroups[ENVIRONMENT] ?: []
+                        return securityGroups[params.ENVIRONMENT] ?: []
                     ''',
                     fallbackScript: "return ['Erro: Ambiente inválido']"
                 ]
-            ],
-            referencedParameters: ['ENVIRONMENT']
+            ]
         )
         
-        activeChoiceReactiveParam(
+        activeChoice(
             name: 'AMI_ID',
             description: 'AMI a ser utilizada',
             choiceType: 'PT_SINGLE_SELECT',
@@ -260,15 +248,14 @@ pipeline {
                                 'ami-prd007 (Golden Image Prod)'
                             ]
                         ]
-                        return amis[ENVIRONMENT] ?: []
+                        return amis[params.ENVIRONMENT] ?: []
                     ''',
                     fallbackScript: "return ['Erro: Ambiente inválido']"
                 ]
-            ],
-            referencedParameters: ['ENVIRONMENT']
+            ]
         )
         
-        activeChoiceReactiveParam(
+        activeChoice(
             name: 'KEY_PAIR',
             description: 'Chave SSH para acesso',
             choiceType: 'PT_SINGLE_SELECT',
@@ -295,12 +282,11 @@ pipeline {
                                 'keypair-prd-emergency'
                             ]
                         ]
-                        return keyPairs[ENVIRONMENT] ?: []
+                        return keyPairs[params.ENVIRONMENT] ?: []
                     ''',
                     fallbackScript: "return ['Erro: Ambiente inválido']"
                 ]
-            ],
-            referencedParameters: ['ENVIRONMENT']
+            ]
         )
         
         choice(
